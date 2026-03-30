@@ -5,6 +5,9 @@
 # Configuración local del agente Claude
 .claude/settings.local.json
 
+# Tareas locales del agente (solo para uso interno)
+tasks/
+
 # Python
 .venv/
 __pycache__/
