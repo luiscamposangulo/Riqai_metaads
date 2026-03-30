@@ -2,20 +2,20 @@
 
 ## Estado actual
 - [x] Estructura del proyecto creada
-- [ ] Setup Meta App y obtención de token
-- [ ] Configuración de variables de entorno
-- [ ] Primer script de conexión a la API
+- [x] Setup Meta App y obtención de token
+- [x] Configuración de variables de entorno
+- [x] Primer script de conexión a la API
 
 ---
 
-## Fase 1 — Setup y Conexión (Prioridad Alta)
+## Fase 1 — Setup y Conexión ✅ COMPLETADA
 
-- [ ] Crear App en Meta for Developers
-- [ ] Configurar permisos requeridos (ads_management, ads_read, manage_pages)
-- [ ] Subir política de privacidad (para modo Live)
-- [ ] Generar User Access Token de larga duración
-- [ ] Crear `.env` con credenciales
-- [ ] Verificar conexión con script de prueba (`src/test_connection.py`)
+- [x] Crear App en Meta for Developers
+- [x] Configurar permisos requeridos (ads_management, ads_read, manage_pages)
+- [x] Subir política de privacidad (GitHub Pages — modo Live activo)
+- [x] Generar User Access Token de larga duración
+- [x] Crear `.env` con credenciales
+- [x] Verificar conexión con script de prueba (`src/test_connection.py`)
 
 ## Fase 2 — Lectura de Datos
 
