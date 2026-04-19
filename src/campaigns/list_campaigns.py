@@ -11,8 +11,12 @@ Uso:
 import os
 import sys
 import argparse
+from pathlib import Path
 import requests
 from dotenv import load_dotenv
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from src.utils.meta_utils import obtener_moneda_cuenta
 
 load_dotenv()
 
@@ -21,37 +25,6 @@ AD_ACCOUNT_ID = os.getenv("META_AD_ACCOUNT_ID")
 BASE_URL = "https://graph.facebook.com/v21.0"
 
 CAMPOS = "id,name,status,objective,daily_budget,lifetime_budget,start_time,stop_time"
-
-# Símbolos por código de moneda ISO 4217
-SIMBOLOS_MONEDA = {
-    "USD": "$",
-    "PEN": "S/",
-    "MXN": "MX$",
-    "COP": "COP$",
-    "ARS": "AR$",
-    "CLP": "CLP$",
-    "EUR": "€",
-    "BRL": "R$",
-}
-
-
-def obtener_moneda_cuenta():
-    """
-    Consulta la moneda configurada en la cuenta publicitaria.
-
-    Returns:
-        Símbolo de moneda (ej: 'S/', '$') o '$' por defecto si falla.
-    """
-    url = f"{BASE_URL}/{AD_ACCOUNT_ID}"
-    params = {"access_token": ACCESS_TOKEN, "fields": "currency"}
-    response = requests.get(url, params=params)
-    data = response.json()
-
-    if "error" in data or "currency" not in data:
-        return "$"  # Fallback si no se puede obtener
-
-    codigo = data["currency"]
-    return SIMBOLOS_MONEDA.get(codigo, codigo)  # Devuelve el código si no está en el mapa
 
 
 def obtener_campanias(filtro_estado=None):

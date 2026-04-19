@@ -23,8 +23,12 @@ import os
 import sys
 import argparse
 from datetime import datetime, timedelta
+from pathlib import Path
 import requests
 from dotenv import load_dotenv
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from src.utils.meta_utils import obtener_moneda_cuenta
 
 load_dotenv()
 
@@ -34,19 +38,6 @@ BASE_URL = "https://graph.facebook.com/v21.0"
 
 CAMPOS_ADS = "id,name,status,effective_status,adset_id,adset_name,campaign_id,campaign_name,creative{id,name,object_type}"
 CAMPOS_INSIGHTS = "impressions,clicks,spend,actions,ctr,cpc"
-
-
-def obtener_moneda_cuenta():
-    """Consulta la moneda configurada en la cuenta publicitaria."""
-    SIMBOLOS = {
-        "USD": "$", "PEN": "S/", "MXN": "MX$", "COP": "COP$",
-        "ARS": "AR$", "CLP": "CLP$", "EUR": "€", "BRL": "R$",
-    }
-    url = f"{BASE_URL}/{AD_ACCOUNT_ID}"
-    params = {"access_token": ACCESS_TOKEN, "fields": "currency"}
-    data = requests.get(url, params=params).json()
-    codigo = data.get("currency", "USD")
-    return SIMBOLOS.get(codigo, codigo)
 
 
 def calcular_fechas(periodo=None, desde=None, hasta=None):
@@ -111,24 +102,41 @@ def obtener_ads(adset_id=None):
     return todos
 
 
-def obtener_insights_ad(ad_id, fecha_inicio, fecha_fin):
-    """Obtiene métricas de un anuncio específico."""
-    url = f"{BASE_URL}/{ad_id}/insights"
+def obtener_todos_insights(fecha_inicio, fecha_fin, adset_id=None):
+    """
+    Obtiene insights de todos los anuncios en una sola llamada a la API.
+
+    Returns:
+        Dict indexado por ad_id para lookup O(1), o None si hubo error.
+    """
+    url = f"{BASE_URL}/{AD_ACCOUNT_ID}/insights"
     params = {
         "access_token": ACCESS_TOKEN,
+        "level": "ad",
         "fields": CAMPOS_INSIGHTS,
         "time_range": f'{{"since":"{fecha_inicio}","until":"{fecha_fin}"}}',
+        "limit": 500,
     }
-    data = requests.get(url, params=params).json()
-    if "error" in data:
-        return None
-    resultados = data.get("data", [])
-    return resultados[0] if resultados else None
+
+    if adset_id:
+        params["filtering"] = f'[{{"field":"adset.id","operator":"EQUAL","value":"{adset_id}"}}]'
+
+    todos = []
+    while url:
+        data = requests.get(url, params=params).json()
+        if "error" in data:
+            print(f"❌ Error al obtener insights: {data['error']['message']}")
+            return None
+        todos.extend(data.get("data", []))
+        url = data.get("paging", {}).get("next")
+        params = {}
+
+    return {item["ad_id"]: item for item in todos}
 
 
-def construir_ranking(ads, fecha_inicio, fecha_fin):
+def construir_ranking(ads, insights_por_id):
     """
-    Enriquece cada anuncio con sus métricas y construye el ranking.
+    Cruza los anuncios con su insights (ya precargados) y construye el ranking.
 
     Returns:
         Lista de anuncios con métricas, ordenada por CPL ascendente (mejor primero).
@@ -136,10 +144,8 @@ def construir_ranking(ads, fecha_inicio, fecha_fin):
     """
     enriquecidos = []
 
-    print(f"   Obteniendo métricas de {len(ads)} anuncios...", end="", flush=True)
-
     for ad in ads:
-        insights = obtener_insights_ad(ad["id"], fecha_inicio, fecha_fin)
+        insights = insights_por_id.get(ad["id"])
 
         if not insights:
             continue  # Sin actividad en el período — omitir del ranking
@@ -172,8 +178,6 @@ def construir_ranking(ads, fecha_inicio, fecha_fin):
             "clics": clics,
             "impresiones": impresiones,
         })
-
-    print(" listo.")
 
     # Ordenar: con leads primero (por CPL asc), sin leads al final (por gasto desc)
     con_resultados = sorted([a for a in enriquecidos if a["cpr"] is not None], key=lambda x: x["cpr"])
@@ -295,7 +299,15 @@ def main():
         sys.exit(0)
 
     print(f"   Anuncios encontrados: {len(ads)}")
-    ranking = construir_ranking(ads, fecha_inicio, fecha_fin)
+    print(f"   Obteniendo métricas...", end="", flush=True)
+
+    insights_por_id = obtener_todos_insights(fecha_inicio, fecha_fin, adset_id=args.adset_id)
+    if insights_por_id is None:
+        sys.exit(1)
+
+    print(" listo.")
+
+    ranking = construir_ranking(ads, insights_por_id)
     imprimir_ranking(ranking, simbolo, top=args.top)
 
 

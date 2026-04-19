@@ -20,8 +20,12 @@ import os
 import sys
 import argparse
 from datetime import datetime, timedelta
+from pathlib import Path
 import requests
 from dotenv import load_dotenv
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from src.utils.meta_utils import obtener_moneda_cuenta
 
 load_dotenv()
 
@@ -30,19 +34,6 @@ AD_ACCOUNT_ID = os.getenv("META_AD_ACCOUNT_ID")
 BASE_URL = "https://graph.facebook.com/v21.0"
 
 CAMPOS_INSIGHTS = "impressions,clicks,spend,actions,ctr,cpc,cpp,reach,frequency"
-
-
-def obtener_moneda_cuenta():
-    """Consulta la moneda configurada en la cuenta publicitaria."""
-    SIMBOLOS = {
-        "USD": "$", "PEN": "S/", "MXN": "MX$", "COP": "COP$",
-        "ARS": "AR$", "CLP": "CLP$", "EUR": "€", "BRL": "R$",
-    }
-    url = f"{BASE_URL}/{AD_ACCOUNT_ID}"
-    params = {"access_token": ACCESS_TOKEN, "fields": "currency"}
-    data = requests.get(url, params=params).json()
-    codigo = data.get("currency", "USD")
-    return SIMBOLOS.get(codigo, codigo)
 
 
 def calcular_fechas(periodo=None, desde=None, hasta=None):
@@ -113,7 +104,7 @@ def obtener_insights_campania(campaign_id, fecha_inicio, fecha_fin):
 
 
 def obtener_campanias_activas():
-    """Obtiene lista de campañas con ID y nombre para iterar."""
+    """Obtiene lista de campañas con ID y nombre."""
     url = f"{BASE_URL}/{AD_ACCOUNT_ID}/campaigns"
     params = {
         "access_token": ACCESS_TOKEN,
@@ -131,6 +122,33 @@ def obtener_campanias_activas():
         url = data.get("paging", {}).get("next")
         params = {}
     return todas
+
+
+def obtener_todos_insights_campanias(fecha_inicio, fecha_fin):
+    """
+    Obtiene insights de todas las campañas en una sola llamada a la API.
+
+    Returns:
+        Dict indexado por campaign_id para lookup O(1), o None si hubo error.
+    """
+    url = f"{BASE_URL}/{AD_ACCOUNT_ID}/insights"
+    params = {
+        "access_token": ACCESS_TOKEN,
+        "level": "campaign",
+        "fields": CAMPOS_INSIGHTS,
+        "time_range": f'{{"since":"{fecha_inicio}","until":"{fecha_fin}"}}',
+        "limit": 500,
+    }
+    todos = []
+    while url:
+        data = requests.get(url, params=params).json()
+        if "error" in data:
+            print(f"❌ Error al obtener insights: {data['error']['message']}")
+            return None
+        todos.extend(data.get("data", []))
+        url = data.get("paging", {}).get("next")
+        params = {}
+    return {item["campaign_id"]: item for item in todos}
 
 
 def imprimir_metricas(nombre, estado, metricas, simbolo):
@@ -196,17 +214,23 @@ def main():
     print("=" * 65)
 
     if args.id:
-        # Métrica de una campaña específica
+        # Campaña específica — una sola llamada directa, ya es eficiente
         metricas = obtener_insights_campania(args.id, fecha_inicio, fecha_fin)
         imprimir_metricas(f"Campaña {args.id}", "ACTIVE", metricas, simbolo)
     else:
-        # Métricas de todas las campañas activas/pausadas
+        # Todas las campañas: 2 llamadas en total (lista + todos los insights)
         campanias = obtener_campanias_activas()
         if campanias is None:
             sys.exit(1)
 
+        print("   Obteniendo métricas...", end="", flush=True)
+        insights_por_campania = obtener_todos_insights_campanias(fecha_inicio, fecha_fin)
+        if insights_por_campania is None:
+            sys.exit(1)
+        print(" listo.\n")
+
         for c in campanias:
-            metricas = obtener_insights_campania(c["id"], fecha_inicio, fecha_fin)
+            metricas = insights_por_campania.get(c["id"])
             imprimir_metricas(c["name"], c["status"], metricas, simbolo)
 
 

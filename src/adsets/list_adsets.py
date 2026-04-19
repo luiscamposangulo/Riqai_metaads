@@ -17,8 +17,12 @@ Uso:
 import os
 import sys
 import argparse
+from pathlib import Path
 import requests
 from dotenv import load_dotenv
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from src.utils.meta_utils import obtener_moneda_cuenta
 
 load_dotenv()
 
@@ -26,24 +30,13 @@ ACCESS_TOKEN = os.getenv("META_ACCESS_TOKEN")
 AD_ACCOUNT_ID = os.getenv("META_AD_ACCOUNT_ID")
 BASE_URL = "https://graph.facebook.com/v21.0"
 
+_cache_geocodificacion = {}
+
 CAMPOS = (
     "id,name,status,daily_budget,lifetime_budget,"
     "bid_strategy,bid_amount,optimization_goal,"
     "targeting,start_time,end_time,campaign_id"
 )
-
-
-def obtener_moneda_cuenta():
-    """Consulta la moneda configurada en la cuenta publicitaria."""
-    SIMBOLOS = {
-        "USD": "$", "PEN": "S/", "MXN": "MX$", "COP": "COP$",
-        "ARS": "AR$", "CLP": "CLP$", "EUR": "€", "BRL": "R$",
-    }
-    url = f"{BASE_URL}/{AD_ACCOUNT_ID}"
-    params = {"access_token": ACCESS_TOKEN, "fields": "currency"}
-    data = requests.get(url, params=params).json()
-    codigo = data.get("currency", "USD")
-    return SIMBOLOS.get(codigo, codigo)
 
 
 def obtener_adsets(campaign_id=None, filtro_estado=None):
@@ -123,6 +116,9 @@ def formatear_segmentacion(targeting):
 
     def geocodificar_inverso(lat, lng):
         """Convierte coordenadas a ciudad y país usando Nominatim (OpenStreetMap)."""
+        clave = (round(lat, 4), round(lng, 4))
+        if clave in _cache_geocodificacion:
+            return _cache_geocodificacion[clave]
         try:
             url = "https://nominatim.openstreetmap.org/reverse"
             params = {"lat": lat, "lon": lng, "format": "json", "zoom": 10}
@@ -137,9 +133,11 @@ def formatear_segmentacion(targeting):
                 or address.get("county", "")
             )
             pais = address.get("country_code", "").upper()
-            return f"{ciudad}, {pais}" if ciudad else None
+            resultado = f"{ciudad}, {pais}" if ciudad else None
         except Exception:
-            return None
+            resultado = None
+        _cache_geocodificacion[clave] = resultado
+        return resultado
 
     def formatear_lugar(loc):
         nombre = loc.get("name", "")
