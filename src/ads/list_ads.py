@@ -34,7 +34,7 @@ load_dotenv()
 
 ACCESS_TOKEN = os.getenv("META_ACCESS_TOKEN")
 AD_ACCOUNT_ID = os.getenv("META_AD_ACCOUNT_ID")
-BASE_URL = "https://graph.facebook.com/v21.0"
+BASE_URL = "https://graph.facebook.com/v25.0"
 
 CAMPOS_ADS = "id,name,status,effective_status,adset_id,adset_name,campaign_id,campaign_name,creative{id,name,object_type}"
 CAMPOS_INSIGHTS = "impressions,clicks,spend,actions,ctr,cpc"

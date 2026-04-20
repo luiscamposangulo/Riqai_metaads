@@ -28,7 +28,7 @@ load_dotenv()
 
 ACCESS_TOKEN = os.getenv("META_ACCESS_TOKEN")
 AD_ACCOUNT_ID = os.getenv("META_AD_ACCOUNT_ID")
-BASE_URL = "https://graph.facebook.com/v21.0"
+BASE_URL = "https://graph.facebook.com/v25.0"
 
 _cache_geocodificacion = {}
 
