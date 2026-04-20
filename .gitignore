@@ -1,6 +1,7 @@
 # Credenciales — nunca subir al repo
 .env
 .env.*
+!.env.example
 
 # Configuración local del agente Claude
 .claude/settings.local.json
